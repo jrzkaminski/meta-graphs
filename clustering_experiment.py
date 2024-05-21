@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.decomposition import PCA, FastICA, FactorAnalysis
 from sklearn.manifold import TSNE, Isomap
 from umap import UMAP
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, DBSCAN
 import torch
 from torch import nn
 from torch.optim import Adam
@@ -13,14 +13,6 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, SAGEConv
 from torch_geometric.utils import from_networkx
 import plotly.express as px
-from stellargraph import StellarGraph
-from stellargraph.data import BiasedRandomWalk
-from stellargraph.mapper import GraphSAGENodeGenerator, Node2VecNodeGenerator
-from stellargraph.layer import GraphSAGE, DeepGraphInfomax
-from stellargraph.layer import Node2Vec as StellarNode2Vec
-from tensorflow.keras.models import Model
-from tensorflow.keras.optimizers import Adam as tfAdam
-from gensim.models import Word2Vec
 
 
 # Define the autoencoder model
@@ -83,7 +75,7 @@ def load_graphs_from_txt(directory):
 
 # Load the datasets
 data_files = []
-for root, dirs, files in os.walk('data'):
+for root, dirs, files in os.walk('data/bnlearn_data'):
     for file in files:
         if file.endswith('.csv'):
             data_files.append(os.path.join(root, file))
@@ -235,25 +227,6 @@ for file in data_files:
         sage_emb = sage_model.conv1(data.x, data.edge_index).mean(axis=0).numpy()
     sage_embeddings.append(sage_emb)
 
-    # Convert the NetworkX graph to a StellarGraph
-    G_stellar = StellarGraph.from_networkx(G, node_features="feature")
-
-    # DeepWalk embeddings
-    rw = BiasedRandomWalk(G_stellar)
-    walks = rw.run(nodes=list(G.nodes()), length=100, n=10, p=0.5, q=2.0)
-    str_walks = [[str(n) for n in walk] for walk in walks]
-    deepwalk_model = Word2Vec(str_walks, vector_size=3, window=5, min_count=0, sg=1, workers=2)
-    deepwalk_emb = np.array([deepwalk_model.wv[str(n)] for n in G.nodes()]).mean(axis=0)
-    deepwalk_embeddings.append(deepwalk_emb)
-
-    # Node2Vec embeddings
-    node2vec = StellarNode2Vec(G_stellar, dimensions=3, walk_length=30, num_walks=200, workers=4)
-    n2v_model = node2vec.fit(window=10, min_count=1, batch_words=4)
-    node2vec_emb = np.array([n2v_model.wv[str(n)] for n in G.nodes()]).mean(axis=0)
-    node2vec_embeddings.append(node2vec_emb)
-
-    file_names.append(file)
-
 # Function to plot and save embeddings
 def save_3d_scatter(embeddings, clusters, dataset_names, title, filename):
     fig = px.scatter_3d(
@@ -270,8 +243,6 @@ def save_3d_scatter(embeddings, clusters, dataset_names, title, filename):
 graph_embeddings_methods = {
     "gcn": gcn_embeddings,
     "sage": sage_embeddings,
-    "deepwalk": deepwalk_embeddings,
-    "node2vec": node2vec_embeddings
 }
 
 dataset_embeddings_methods = {
@@ -287,7 +258,7 @@ dataset_embeddings_methods = {
 dataset_names = [os.path.basename(emb[0]).replace('.csv', '') for emb in data_embeddings]
 
 for graph_method, graph_embs in graph_embeddings_methods.items():
-    graph_clusters = KMeans(n_clusters=10).fit_predict(graph_embs)
+    graph_clusters = KMeans(n_clusters=3).fit_predict(graph_embs)
     for dataset_method, dataset_embs in dataset_embeddings_methods.items():
         dataset_embs_np = np.array(dataset_embs)
         save_3d_scatter(

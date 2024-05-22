@@ -19,14 +19,8 @@ import plotly.express as px
 class Autoencoder(nn.Module):
     def __init__(self, input_dim, encoding_dim):
         super(Autoencoder, self).__init__()
-        self.encoder = nn.Sequential(
-            nn.Linear(input_dim, encoding_dim),
-            nn.ReLU()
-        )
-        self.decoder = nn.Sequential(
-            nn.Linear(encoding_dim, input_dim),
-            nn.Sigmoid()
-        )
+        self.encoder = nn.Sequential(nn.Linear(input_dim, encoding_dim), nn.ReLU())
+        self.decoder = nn.Sequential(nn.Linear(encoding_dim, input_dim), nn.Sigmoid())
 
     def forward(self, x):
         encoded = self.encoder(x)
@@ -49,6 +43,7 @@ class GCN(nn.Module):
         x = self.conv2(x, edge_index)
         return x
 
+
 # Define GraphSAGE model
 class GraphSAGENet(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
@@ -64,20 +59,22 @@ class GraphSAGENet(torch.nn.Module):
         x = self.conv2(x, edge_index)
         return x
 
+
 # Function to load graphs from txt files
 def load_graphs_from_txt(directory):
     graph_files = []
     for root, dirs, files in os.walk(directory):
         for file in files:
-            if file.endswith('.txt'):
+            if file.endswith(".txt"):
                 graph_files.append(os.path.join(root, file))
     return graph_files
 
+
 # Load the datasets
 data_files = []
-for root, dirs, files in os.walk('data/bnlearn_data'):
+for root, dirs, files in os.walk("data/bnlearn_data"):
     for file in files:
-        if file.endswith('.csv'):
+        if file.endswith(".csv"):
             data_files.append(os.path.join(root, file))
 
 # Initialize the lists
@@ -99,10 +96,10 @@ for file in data_files:
     dataset = dataset.fillna(dataset.mean())
 
     # Ensure all data is numeric
-    dataset = dataset.apply(pd.to_numeric, errors='coerce')
+    dataset = dataset.apply(pd.to_numeric, errors="coerce")
 
     # Convert boolean columns to integers
-    for col in dataset.select_dtypes(include='bool').columns:
+    for col in dataset.select_dtypes(include="bool").columns:
         dataset[col] = dataset[col].astype(int)
 
     # Fill any remaining NaN values that could result from the conversion
@@ -146,7 +143,9 @@ for file in data_files:
     dataset_torch = torch.tensor(dataset.values, dtype=torch.float32)
 
     # Normalize the data to be between 0 and 1
-    dataset_torch = (dataset_torch - dataset_torch.min()) / (dataset_torch.max() - dataset_torch.min())
+    dataset_torch = (dataset_torch - dataset_torch.min()) / (
+        dataset_torch.max() - dataset_torch.min()
+    )
 
     # Train the autoencoder
     for epoch in range(50):
@@ -165,11 +164,22 @@ for file in data_files:
         autoencoder_embeddings = autoencoder.encoder(dataset_torch).mean(axis=0).numpy()
 
     # Append the embeddings to the list
-    data_embeddings.append((file, pca_embeddings, tsne_embeddings, umap_embeddings, ica_embeddings, fa_embeddings, isomap_embeddings, autoencoder_embeddings))
+    data_embeddings.append(
+        (
+            file,
+            pca_embeddings,
+            tsne_embeddings,
+            umap_embeddings,
+            ica_embeddings,
+            fa_embeddings,
+            isomap_embeddings,
+            autoencoder_embeddings,
+        )
+    )
 
     # Load the corresponding graph
-    graph_file = file.replace('.csv', '.txt')
-    with open(graph_file, 'r') as f:
+    graph_file = file.replace(".csv", ".txt")
+    with open(graph_file, "r") as f:
         edges = [tuple(line.strip().split()) for line in f]
 
     # Create a directed graph
@@ -182,12 +192,12 @@ for file in data_files:
 
     # Add dummy node features
     for i in G.nodes:
-        G.nodes[i]['feature'] = [1.0] * 10
+        G.nodes[i]["feature"] = [1.0] * 10
 
     data = from_networkx(G)
 
     # Convert node features to tensor
-    data.x = torch.tensor([G.nodes[i]['feature'] for i in G.nodes], dtype=torch.float)
+    data.x = torch.tensor([G.nodes[i]["feature"] for i in G.nodes], dtype=torch.float)
 
     # Initialize GCN model, optimizer, and loss function
     gcn_model = GCN(num_node_features=10, hidden_dim=16, num_classes=3)
@@ -199,7 +209,9 @@ for file in data_files:
     for epoch in range(200):
         optimizer.zero_grad()
         out = gcn_model(data)
-        loss = criterion(out, torch.tensor([0 for _ in G.nodes], dtype=torch.long))  # Dummy labels
+        loss = criterion(
+            out, torch.tensor([0 for _ in G.nodes], dtype=torch.long)
+        )  # Dummy labels
         loss.backward()
         optimizer.step()
 
@@ -218,7 +230,9 @@ for file in data_files:
     for epoch in range(200):
         optimizer.zero_grad()
         out = sage_model(data)
-        loss = criterion(out, torch.tensor([0 for _ in G.nodes], dtype=torch.long))  # Dummy labels
+        loss = criterion(
+            out, torch.tensor([0 for _ in G.nodes], dtype=torch.long)
+        )  # Dummy labels
         loss.backward()
         optimizer.step()
 
@@ -226,6 +240,7 @@ for file in data_files:
     with torch.no_grad():
         sage_emb = sage_model.conv1(data.x, data.edge_index).mean(axis=0).numpy()
     sage_embeddings.append(sage_emb)
+
 
 # Function to plot and save embeddings
 def save_3d_scatter(embeddings, clusters, dataset_names, title, filename):
@@ -235,9 +250,10 @@ def save_3d_scatter(embeddings, clusters, dataset_names, title, filename):
         z=embeddings[:, 2],
         color=clusters,
         text=dataset_names,
-        title=title
+        title=title,
     )
     fig.write_html(filename)
+
 
 # Prepare and save plots for each combination of dataset embedding and graph embedding
 graph_embeddings_methods = {
@@ -252,10 +268,12 @@ dataset_embeddings_methods = {
     "ica": [emb[4] for emb in data_embeddings],
     "fa": [emb[5] for emb in data_embeddings],
     "isomap": [emb[6] for emb in data_embeddings],
-    "autoencoder": [emb[7] for emb in data_embeddings]
+    "autoencoder": [emb[7] for emb in data_embeddings],
 }
 
-dataset_names = [os.path.basename(emb[0]).replace('.csv', '') for emb in data_embeddings]
+dataset_names = [
+    os.path.basename(emb[0]).replace(".csv", "") for emb in data_embeddings
+]
 
 for graph_method, graph_embs in graph_embeddings_methods.items():
     graph_clusters = KMeans(n_clusters=3).fit_predict(graph_embs)
@@ -266,5 +284,5 @@ for graph_method, graph_embs in graph_embeddings_methods.items():
             graph_clusters,
             dataset_names,
             f"{dataset_method.upper()} Embeddings with {graph_method.upper()} Graph Clusters",
-            f"{dataset_method}_{graph_method}_embeddings.html"
+            f"{dataset_method}_{graph_method}_embeddings.html",
         )

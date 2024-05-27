@@ -14,7 +14,8 @@ from torch_geometric.nn import GCNConv, SAGEConv
 from torch_geometric.utils import from_networkx
 import plotly.express as px
 
-# Define the autoencoder model
+
+# Autoencoder model
 class Autoencoder(nn.Module):
     def __init__(self, input_dim, encoding_dim):
         super(Autoencoder, self).__init__()
@@ -26,7 +27,8 @@ class Autoencoder(nn.Module):
         decoded = self.decoder(encoded)
         return decoded
 
-# Define GCN model
+
+# GCN model
 class GCN(nn.Module):
     def __init__(self, num_node_features, hidden_dim, num_classes):
         super(GCN, self).__init__()
@@ -41,7 +43,8 @@ class GCN(nn.Module):
         x = self.conv2(x, edge_index)
         return x
 
-# Define GraphSAGE model
+
+# GraphSAGE model
 class GraphSAGENet(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(GraphSAGENet, self).__init__()
@@ -56,6 +59,7 @@ class GraphSAGENet(torch.nn.Module):
         x = self.conv2(x, edge_index)
         return x
 
+
 # Function to load graphs from txt files
 def load_graphs_from_txt(directory):
     graph_files = []
@@ -65,76 +69,64 @@ def load_graphs_from_txt(directory):
                 graph_files.append(os.path.join(root, file))
     return graph_files
 
-# Load the datasets
-data_files = []
-for root, dirs, files in os.walk("data/"):
-    for file in files:
-        if file.endswith(".csv"):
-            data_files.append(os.path.join(root, file))
 
-# Initialize the lists
-data_embeddings = []
-gcn_embeddings = []
-sage_embeddings = []
-file_names = []
+# Function to load datasets from csv files
+def load_datasets(directory):
+    data_files = []
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if file.endswith(".csv"):
+                data_files.append(os.path.join(root, file))
+    return data_files
 
-for file in data_files:
-    # Load the dataset
+
+# Function to preprocess the dataset
+def preprocess_dataset(file):
     dataset = pd.read_csv(file)
-
-    # One-Hot Encoding for categorical features
     dataset = pd.get_dummies(dataset)
-
-    # Handle missing values by filling them with the mean of each column
     dataset = dataset.fillna(dataset.mean())
-
-    # Ensure all data is numeric
     dataset = dataset.apply(pd.to_numeric, errors="coerce")
-
-    # Convert boolean columns to integers
-    for col in dataset.select_dtypes(include="bool").columns:
-        dataset[col] = dataset[col].astype(int)
-
-    # Fill any remaining NaN values that could result from the conversion
     dataset = dataset.fillna(0)
+    return dataset.astype(np.float32)
 
-    # t-SNE for numerical data
+
+# Function to generate embeddings using various methods
+def generate_embeddings(dataset):
     tsne = TSNE(n_components=3)
     tsne_embeddings = tsne.fit_transform(dataset).mean(axis=0)
 
-    # UMAP for numerical data
     umap = UMAP(n_components=3)
     umap_embeddings = umap.fit_transform(dataset).mean(axis=0)
 
-    # SE for numerical data
     se = SpectralEmbedding(n_components=3)
     se_embeddings = se.fit_transform(dataset).mean(axis=0)
 
-    # Factor Analysis for numerical data
     fa = FactorAnalysis(n_components=3)
     fa_embeddings = fa.fit_transform(dataset).mean(axis=0)
 
-    # Isomap for numerical data
     isomap = Isomap(n_components=3)
     isomap_embeddings = isomap.fit_transform(dataset).mean(axis=0)
 
-    # Define the size of the encoded representations
+    return (
+        tsne_embeddings,
+        umap_embeddings,
+        se_embeddings,
+        fa_embeddings,
+        isomap_embeddings,
+    )
+
+
+# Function to train autoencoder and generate embeddings
+def autoencoder_embeddings(dataset):
     encoding_dim = 3
-
-    # Define the autoencoder model
     autoencoder = Autoencoder(dataset.shape[1], encoding_dim)
-
-    # Define the optimizer and loss function
     optimizer = Adam(autoencoder.parameters())
     criterion = nn.MSELoss()
-
-    # Convert the dataset to PyTorch tensors
     dataset_torch = torch.tensor(dataset.values, dtype=torch.float32)
+    dataset_torch = (dataset_torch - dataset_torch.min()) / (
+        dataset_torch.max() - dataset_torch.min()
+    )
 
-    # Normalize the data to be between 0 and 1
-    dataset_torch = (dataset_torch - dataset_torch.min()) / (dataset_torch.max() - dataset_torch.min())
-
-    # Train the autoencoder
     for epoch in range(50):
         autoencoder.train()
         optimizer.zero_grad()
@@ -143,85 +135,63 @@ for file in data_files:
         loss.backward()
         optimizer.step()
 
-    # Switch the model to evaluation mode
     autoencoder.eval()
-
-    # Generate the embeddings
     with torch.no_grad():
-        autoencoder_embeddings = autoencoder.encoder(dataset_torch).mean(axis=0).numpy()
+        return autoencoder.encoder(dataset_torch).mean(axis=0).numpy()
 
-    # Append the embeddings to the list
-    data_embeddings.append(
-        (
-            file,
-            tsne_embeddings,
-            umap_embeddings,
-            se_embeddings,
-            fa_embeddings,
-            isomap_embeddings,
-            autoencoder_embeddings,
-        )
-    )
 
-    # Load the corresponding graph
-    graph_file = file.replace(".csv", ".txt")
+# Function to load graph from txt file and convert to PyTorch geometric data
+def load_graph(graph_file):
     with open(graph_file, "r") as f:
         edges = [tuple(line.strip().split()) for line in f]
-
-    # Create a directed graph
     G = nx.DiGraph()
     G.add_edges_from(edges)
-
-    # Create a mapping from node labels to numeric indices
     mapping = {node: idx for idx, node in enumerate(G.nodes())}
     G = nx.relabel_nodes(G, mapping)
-
-    # Add dummy node features
     for i in G.nodes:
         G.nodes[i]["feature"] = [1.0] * 10
-
     data = from_networkx(G)
+    data.x = torch.tensor([G.nodes[i]["feature"] for i in G.nodes], dtype=torch.float32)
+    return data
 
-    # Convert node features to tensor
-    data.x = torch.tensor([G.nodes[i]["feature"] for i in G.nodes], dtype=torch.float)
 
-    # Initialize GCN model, optimizer, and loss function
+# Function to train GCN model and generate embeddings
+def gcn_embeddings(data):
     gcn_model = GCN(num_node_features=10, hidden_dim=16, num_classes=3)
     optimizer = torch.optim.Adam(gcn_model.parameters(), lr=0.01)
     criterion = torch.nn.CrossEntropyLoss()
 
-    # Training loop for GCN
     gcn_model.train()
     for epoch in range(200):
         optimizer.zero_grad()
         out = gcn_model(data)
-        loss = criterion(out, torch.tensor([0 for _ in G.nodes], dtype=torch.long))  # Dummy labels
+        loss = criterion(out, torch.tensor([0 for _ in data.x], dtype=torch.long))
         loss.backward()
         optimizer.step()
 
     gcn_model.eval()
     with torch.no_grad():
-        gcn_emb = gcn_model.conv1(data.x, data.edge_index).mean(axis=0).numpy()
-    gcn_embeddings.append(gcn_emb)
+        return gcn_model.conv1(data.x, data.edge_index).mean(axis=0).numpy()
 
-    # Initialize GraphSAGE model, optimizer, and loss function
+
+# Function to train GraphSAGE model and generate embeddings
+def sage_embeddings(data):
     sage_model = GraphSAGENet(in_channels=10, hidden_channels=16, out_channels=3)
     optimizer = torch.optim.Adam(sage_model.parameters(), lr=0.01)
     criterion = torch.nn.CrossEntropyLoss()
 
-    # Training loop for GraphSAGE
     sage_model.train()
     for epoch in range(200):
         optimizer.zero_grad()
         out = sage_model(data)
-        loss = criterion(out, torch.tensor([0 for _ in G.nodes], dtype=torch.long))  # Dummy labels
+        loss = criterion(out, torch.tensor([0 for _ in data.x], dtype=torch.long))
         loss.backward()
         optimizer.step()
 
     sage_model.eval()
     with torch.no_grad():
-        sage_emb = sage_model.conv1(data.x, data.edge_index).mean(axis=0).numpy()
-    sage_embeddings.append(sage_emb)
+        return sage_model.conv1(data.x, data.edge_index).mean(axis=0).numpy()
+
 
 # Function to plot and save embeddings
 def save_3d_scatter(embeddings, clusters, dataset_names, title, filename):
@@ -235,33 +205,69 @@ def save_3d_scatter(embeddings, clusters, dataset_names, title, filename):
     )
     fig.write_html(filename)
 
-# Prepare and save plots for each combination of dataset embedding and graph embedding
-graph_embeddings_methods = {
-    "gcn": gcn_embeddings,
-    "sage": sage_embeddings,
-}
 
-dataset_embeddings_methods = {
-    "tsne": [emb[1] for emb in data_embeddings],
-    "umap": [emb[2] for emb in data_embeddings],
-    "se": [emb[3] for emb in data_embeddings],
-    "fa": [emb[4] for emb in data_embeddings],
-    "isomap": [emb[5] for emb in data_embeddings],
-    "autoencoder": [emb[6] for emb in data_embeddings],
-}
+def main():
+    data_files = load_datasets("data/")
+    data_embeddings = []
+    gcn_embeddings_list = []
+    sage_embeddings_list = []
+    dataset_names = []
 
-dataset_names = [
-    os.path.basename(emb[0]).replace(".csv", "") for emb in data_embeddings
-]
-
-for graph_method, graph_embs in graph_embeddings_methods.items():
-    graph_clusters = KMeans(n_clusters=3).fit_predict(graph_embs)
-    for dataset_method, dataset_embs in dataset_embeddings_methods.items():
-        dataset_embs_np = np.array(dataset_embs)
-        save_3d_scatter(
-            dataset_embs_np,
-            graph_clusters,
-            dataset_names,
-            f"{dataset_method.upper()} Embeddings with {graph_method.upper()} Graph Clusters",
-            f"{dataset_method}_{graph_method}_embeddings.html",
+    for file in data_files:
+        dataset = preprocess_dataset(file)
+        (
+            tsne_embeddings,
+            umap_embeddings,
+            se_embeddings,
+            fa_embeddings,
+            isomap_embeddings,
+        ) = generate_embeddings(dataset)
+        autoencoder_emb = autoencoder_embeddings(dataset)
+        data_embeddings.append(
+            (
+                file,
+                tsne_embeddings,
+                umap_embeddings,
+                se_embeddings,
+                fa_embeddings,
+                isomap_embeddings,
+                autoencoder_emb,
+            )
         )
+        graph_file = file.replace(".csv", ".txt")
+        graph_data = load_graph(graph_file)
+        gcn_emb = gcn_embeddings(graph_data)
+        gcn_embeddings_list.append(gcn_emb)
+        sage_emb = sage_embeddings(graph_data)
+        sage_embeddings_list.append(sage_emb)
+        dataset_names.append(os.path.basename(file).replace(".csv", ""))
+
+    graph_embeddings_methods = {
+        "gcn": gcn_embeddings_list,
+        "sage": sage_embeddings_list,
+    }
+
+    dataset_embeddings_methods = {
+        "tsne": [emb[1] for emb in data_embeddings],
+        "umap": [emb[2] for emb in data_embeddings],
+        "se": [emb[3] for emb in data_embeddings],
+        "fa": [emb[4] for emb in data_embeddings],
+        "isomap": [emb[5] for emb in data_embeddings],
+        "autoencoder": [emb[6] for emb in data_embeddings],
+    }
+
+    for graph_method, graph_embs in graph_embeddings_methods.items():
+        graph_clusters = KMeans(n_clusters=3).fit_predict(graph_embs)
+        for dataset_method, dataset_embs in dataset_embeddings_methods.items():
+            dataset_embs_np = np.array(dataset_embs)
+            save_3d_scatter(
+                dataset_embs_np,
+                graph_clusters,
+                dataset_names,
+                f"{dataset_method.upper()} Embeddings with {graph_method.upper()} Graph Clusters",
+                f"{dataset_method}_{graph_method}_embeddings.html",
+            )
+
+
+if __name__ == "__main__":
+    main()

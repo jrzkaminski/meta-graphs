@@ -1,10 +1,10 @@
 import os
 import pandas as pd
 import numpy as np
-from sklearn.decomposition import PCA, FastICA, FactorAnalysis
-from sklearn.manifold import TSNE, Isomap
+from sklearn.decomposition import FactorAnalysis
+from sklearn.manifold import TSNE, Isomap, SpectralEmbedding
 from umap import UMAP
-from sklearn.cluster import KMeans, DBSCAN
+from sklearn.cluster import KMeans
 import torch
 from torch import nn
 from torch.optim import Adam
@@ -13,7 +13,6 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, SAGEConv
 from torch_geometric.utils import from_networkx
 import plotly.express as px
-
 
 # Define the autoencoder model
 class Autoencoder(nn.Module):
@@ -26,7 +25,6 @@ class Autoencoder(nn.Module):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
         return decoded
-
 
 # Define GCN model
 class GCN(nn.Module):
@@ -43,7 +41,6 @@ class GCN(nn.Module):
         x = self.conv2(x, edge_index)
         return x
 
-
 # Define GraphSAGE model
 class GraphSAGENet(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
@@ -59,7 +56,6 @@ class GraphSAGENet(torch.nn.Module):
         x = self.conv2(x, edge_index)
         return x
 
-
 # Function to load graphs from txt files
 def load_graphs_from_txt(directory):
     graph_files = []
@@ -69,10 +65,9 @@ def load_graphs_from_txt(directory):
                 graph_files.append(os.path.join(root, file))
     return graph_files
 
-
 # Load the datasets
 data_files = []
-for root, dirs, files in os.walk("data/bnlearn_data"):
+for root, dirs, files in os.walk("data/"):
     for file in files:
         if file.endswith(".csv"):
             data_files.append(os.path.join(root, file))
@@ -81,8 +76,6 @@ for root, dirs, files in os.walk("data/bnlearn_data"):
 data_embeddings = []
 gcn_embeddings = []
 sage_embeddings = []
-deepwalk_embeddings = []
-node2vec_embeddings = []
 file_names = []
 
 for file in data_files:
@@ -105,10 +98,6 @@ for file in data_files:
     # Fill any remaining NaN values that could result from the conversion
     dataset = dataset.fillna(0)
 
-    # PCA for numerical data
-    pca = PCA(n_components=3)
-    pca_embeddings = pca.fit_transform(dataset).mean(axis=0)
-
     # t-SNE for numerical data
     tsne = TSNE(n_components=3)
     tsne_embeddings = tsne.fit_transform(dataset).mean(axis=0)
@@ -117,9 +106,9 @@ for file in data_files:
     umap = UMAP(n_components=3)
     umap_embeddings = umap.fit_transform(dataset).mean(axis=0)
 
-    # ICA for numerical data
-    ica = FastICA(n_components=3)
-    ica_embeddings = ica.fit_transform(dataset).mean(axis=0)
+    # SE for numerical data
+    se = SpectralEmbedding(n_components=3)
+    se_embeddings = se.fit_transform(dataset).mean(axis=0)
 
     # Factor Analysis for numerical data
     fa = FactorAnalysis(n_components=3)
@@ -143,9 +132,7 @@ for file in data_files:
     dataset_torch = torch.tensor(dataset.values, dtype=torch.float32)
 
     # Normalize the data to be between 0 and 1
-    dataset_torch = (dataset_torch - dataset_torch.min()) / (
-        dataset_torch.max() - dataset_torch.min()
-    )
+    dataset_torch = (dataset_torch - dataset_torch.min()) / (dataset_torch.max() - dataset_torch.min())
 
     # Train the autoencoder
     for epoch in range(50):
@@ -167,10 +154,9 @@ for file in data_files:
     data_embeddings.append(
         (
             file,
-            pca_embeddings,
             tsne_embeddings,
             umap_embeddings,
-            ica_embeddings,
+            se_embeddings,
             fa_embeddings,
             isomap_embeddings,
             autoencoder_embeddings,
@@ -209,9 +195,7 @@ for file in data_files:
     for epoch in range(200):
         optimizer.zero_grad()
         out = gcn_model(data)
-        loss = criterion(
-            out, torch.tensor([0 for _ in G.nodes], dtype=torch.long)
-        )  # Dummy labels
+        loss = criterion(out, torch.tensor([0 for _ in G.nodes], dtype=torch.long))  # Dummy labels
         loss.backward()
         optimizer.step()
 
@@ -230,9 +214,7 @@ for file in data_files:
     for epoch in range(200):
         optimizer.zero_grad()
         out = sage_model(data)
-        loss = criterion(
-            out, torch.tensor([0 for _ in G.nodes], dtype=torch.long)
-        )  # Dummy labels
+        loss = criterion(out, torch.tensor([0 for _ in G.nodes], dtype=torch.long))  # Dummy labels
         loss.backward()
         optimizer.step()
 
@@ -240,7 +222,6 @@ for file in data_files:
     with torch.no_grad():
         sage_emb = sage_model.conv1(data.x, data.edge_index).mean(axis=0).numpy()
     sage_embeddings.append(sage_emb)
-
 
 # Function to plot and save embeddings
 def save_3d_scatter(embeddings, clusters, dataset_names, title, filename):
@@ -254,7 +235,6 @@ def save_3d_scatter(embeddings, clusters, dataset_names, title, filename):
     )
     fig.write_html(filename)
 
-
 # Prepare and save plots for each combination of dataset embedding and graph embedding
 graph_embeddings_methods = {
     "gcn": gcn_embeddings,
@@ -262,13 +242,12 @@ graph_embeddings_methods = {
 }
 
 dataset_embeddings_methods = {
-    "pca": [emb[1] for emb in data_embeddings],
-    "tsne": [emb[2] for emb in data_embeddings],
-    "umap": [emb[3] for emb in data_embeddings],
-    "ica": [emb[4] for emb in data_embeddings],
-    "fa": [emb[5] for emb in data_embeddings],
-    "isomap": [emb[6] for emb in data_embeddings],
-    "autoencoder": [emb[7] for emb in data_embeddings],
+    "tsne": [emb[1] for emb in data_embeddings],
+    "umap": [emb[2] for emb in data_embeddings],
+    "se": [emb[3] for emb in data_embeddings],
+    "fa": [emb[4] for emb in data_embeddings],
+    "isomap": [emb[5] for emb in data_embeddings],
+    "autoencoder": [emb[6] for emb in data_embeddings],
 }
 
 dataset_names = [

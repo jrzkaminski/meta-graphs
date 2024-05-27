@@ -1,0 +1,16 @@
+x-box width
+x-box y-box
+y-box high
+width onpix
+onpix x-ege
+x-ege class
+class x2ybr
+class y-bar
+class xegvy
+class y-ege
+class xy2br
+class y2bar
+class x2bar
+class xybar
+class x-bar
+class yegvx

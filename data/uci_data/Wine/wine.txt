@@ -1,0 +1,12 @@
+total_phenols proanthocyanins
+flavanoids class
+flavanoids total_phenols
+class OD280/OD315
+class color_intensity
+class proline
+class alcohol
+class hue
+class magnesium
+class ash_alcalinity
+class malic_acid
+class nonflavanoid_phenols

@@ -1,0 +1,4 @@
+Age year
+class year
+positive_axillary_nodes class
+positive_axillary_nodes year

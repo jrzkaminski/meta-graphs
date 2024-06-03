@@ -1,1 +1,10 @@
+class petal_length
+class sepal_length
+class sepal_width
 petal_width class
+petal_width petal_length
+petal_width sepal_length
+petal_width sepal_width
+sepal_length petal_length
+sepal_width petal_length
+sepal_width sepal_length

@@ -1,0 +1,17 @@
+vedge-mean vedge-sd
+hedge-mean vedge-mean
+intensity-mean rawred-mean
+intensity-mean class
+intensity-mean hedge-mean
+rawred-mean rawgreen-mean
+rawblue-mean intensity-mean
+rawblue-mean exblue-mean
+exblue-mean exred-mean
+exgreen-mean exblue-mean
+value-mean rawblue-mean
+class region-centroid-row
+class hue-mean
+class exgreen-mean
+class saturation-mean
+class exred-mean
+class region-centroid-col

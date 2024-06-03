@@ -1,4 +1,7 @@
-L-Weight class
+L-Distance L-Weight
+R-Distance L-Weight
+R-Weight L-Weight
 class L-Distance
-class R-Weight
+class L-Weight
 class R-Distance
+class R-Weight

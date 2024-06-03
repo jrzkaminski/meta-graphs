@@ -1,0 +1,10 @@
+Feature 1 class
+Feature 3 Feature 1
+Feature 3 Feature 6
+Feature 4 Feature 8
+Feature 5 Feature 2
+Feature 7 Feature 9
+class Feature 0
+class Feature 4
+class Feature 5
+class Feature 7

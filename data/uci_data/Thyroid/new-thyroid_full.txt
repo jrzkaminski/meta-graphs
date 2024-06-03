@@ -1,0 +1,5 @@
+T3-resin class
+class thyroxin
+class triiodothyronine
+class TSH_abs_diff
+class TSH

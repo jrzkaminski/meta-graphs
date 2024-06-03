@@ -1,9 +1,9 @@
 Uniformity_Cell_Size class
-class Uniformity_Cell_Shape
+Uniformity_Cell_Size Single_Epithelial_Cell_Size
+Uniformity_Cell_Shape Uniformity_Cell_Size
 class Bare_Nuclei
 class Bland_Chromatin
-class Single_Epithelial_Cell_Size
 class Normal_Nucleoli
-class Marginal_Adhesion
 class Clump_Thickness
+class Marginal_Adhesion
 class Mitoses

@@ -1,0 +1,9 @@
+Frequency Monetary
+Frequency Recency
+Frequency Time
+Frequency class
+Monetary Recency
+Monetary Time
+Recency Time
+class Recency
+class Time

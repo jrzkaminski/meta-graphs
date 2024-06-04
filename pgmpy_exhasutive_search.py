@@ -7,6 +7,8 @@ from sklearn.preprocessing import KBinsDiscretizer
 def learn_causal_structure(csv_path):
     # Load the dataset
     data = pd.read_csv(csv_path)
+    if 'Unnamed: 0' in data.columns:
+        data = data.drop('Unnamed: 0', axis=1)
 
     # Select columns to discretize: float columns and integer columns with more than 10 unique values
     continuous_columns = data.select_dtypes(include='float').columns

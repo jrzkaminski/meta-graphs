@@ -1,11 +1,11 @@
-hedge-sd vedge-sd
+vedge-sd hedge-sd
+intensity-mean rawred-mean
 intensity-mean rawblue-mean
 intensity-mean class
 intensity-mean exred-mean
-rawred-mean intensity-mean
+rawred-mean rawgreen-mean
 rawblue-mean value-mean
 rawblue-mean exblue-mean
-rawgreen-mean rawred-mean
 class region-centroid-row
 class exgreen-mean
 class hue-mean

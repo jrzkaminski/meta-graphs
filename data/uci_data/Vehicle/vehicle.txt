@@ -1,16 +1,16 @@
-circularity max.length rectangularity
-circularity scaled radius of gyration
-radius ratio pr.axis aspect ratio
-scatter ratio elongatedness
-scatter ratio scaled variance along major axis
-scatter ratio circularity
-scatter ratio class
-elongatedness distance circularity
-elongatedness radius ratio
-pr.axis rectangularity scaled variance along minor axis
-scaled variance along minor axis scatter ratio
-scaled variance along minor axis compactness
-scaled variance along minor axis hollows ratio
-hollows ratio kurtosis about major axis
-hollows ratio skewness about major axis
-class kurtosis about minor axis
+circularity max.length_rectangularity
+circularity pr.axis_rectangularity
+radius_ratio pr.axis_aspect_ratio
+scatter_ratio elongatedness
+scatter_ratio scaled_variance_along_major_axis
+scatter_ratio class
+elongatedness distance_circularity
+elongatedness radius_ratio
+pr.axis_rectangularity scaled_variance_along_minor_axis
+scaled_variance_along_minor_axis scatter_ratio
+scaled_variance_along_minor_axis compactness
+scaled_variance_along_minor_axis kurtosis_about_major_axis
+scaled_radius_of_gyration circularity
+kurtosis_about_major_axis hollows_ratio
+hollows_ratio skewness_about_major_axis
+class kurtosis_about_minor_axis

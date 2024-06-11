@@ -15,10 +15,12 @@ from torch_geometric.utils import from_networkx
 from sklearn.metrics import adjusted_rand_score
 import logging
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 # Autoencoder model
 class Autoencoder(nn.Module):
@@ -88,67 +90,49 @@ def load_datasets(directory):
 # Function to preprocess the dataset
 def preprocess_dataset(file):
     dataset = pd.read_csv(file)
+    if "Unnamed: 0" in dataset.columns:
+        dataset = dataset.drop("Unnamed: 0", axis=1)
     dataset = pd.get_dummies(dataset)
-    if 'Unnamed: 0' in dataset.columns:
-        dataset = dataset.drop(columns=['Unnamed: 0'])
     dataset = dataset.fillna(dataset.mean())
     dataset = dataset.apply(pd.to_numeric, errors="coerce")
     dataset = dataset.fillna(0)
-    return dataset.astype(np.float32)
+    return dataset.astype(np.float32).to_numpy()
 
 
-# Function to standardize dataset features
-def standardize_features(datasets):
-    max_features = max(dataset.shape[1] for dataset in datasets)
-    standardized_datasets = []
-    for dataset in datasets:
-        if dataset.shape[1] < max_features:
-            extra_features = np.zeros((dataset.shape[0], max_features - dataset.shape[1]))
-            standardized_dataset = np.hstack((dataset, extra_features))
+# Function to pad embeddings to the same length
+def pad_embeddings(embeddings, max_length):
+    padded_embeddings = []
+    for emb in embeddings:
+        if len(emb) < max_length:
+            padding = np.zeros(max_length - len(emb))
+            padded_emb = np.concatenate((emb, padding))
         else:
-            standardized_dataset = dataset
-        standardized_datasets.append(standardized_dataset)
-    return standardized_datasets
-
-
-# Function to standardize dataset samples
-def standardize_samples(datasets):
-    max_samples = max(dataset.shape[0] for dataset in datasets)
-    standardized_datasets = []
-    for dataset in datasets:
-        if dataset.shape[0] < max_samples:
-            extra_samples = np.zeros((max_samples - dataset.shape[0], dataset.shape[1]))
-            standardized_dataset = np.vstack((dataset, extra_samples))
-        else:
-            standardized_dataset = dataset
-        standardized_datasets.append(standardized_dataset)
-    return standardized_datasets
+            padded_emb = emb
+        padded_embeddings.append(padded_emb)
+    return np.array(padded_embeddings)
 
 
 # Function to generate embeddings using various methods
-def generate_embeddings(dataset, method):
-    if method == 'tsne':
-        model = TSNE(n_components=1, n_jobs=-1)
-    elif method == 'umap':
-        model = UMAP(n_components=1, n_jobs=-1)
-    elif method == 'se':
-        model = SpectralEmbedding(n_components=1)
-    elif method == 'fa':
-        model = FactorAnalysis(n_components=1)
-    elif method == 'kpca':
-        model = KernelPCA(n_components=1, kernel='rbf', n_jobs=-1)
-    else:
-        raise ValueError(f"Unknown method: {method}")
-
+def generate_embeddings(dataset, method, embedding_dim):
+    match method:
+        case 'tsne':
+            model = TSNE(n_components=embedding_dim)
+        case 'umap':
+            model = UMAP(n_components=embedding_dim)
+        case 'se':
+            model = SpectralEmbedding(n_components=embedding_dim)
+        case 'fa':
+            model = FactorAnalysis(n_components=embedding_dim)
+        case 'kpca':
+            model = KernelPCA(n_components=embedding_dim, kernel='rbf')
+        case _:
+            raise ValueError(f"Unknown method: {method}")
     return model.fit_transform(dataset).flatten()
 
 
 # Function to train autoencoder and generate embeddings
-def autoencoder_embeddings(dataset):
-    if isinstance(dataset, pd.DataFrame):
-        dataset = dataset.values
-    encoding_dim = 1
-    autoencoder = Autoencoder(dataset.shape[1], encoding_dim)
+def autoencoder_embeddings(dataset, embedding_dim):
+    autoencoder = Autoencoder(dataset.shape[1], embedding_dim)
     optimizer = Adam(autoencoder.parameters())
     criterion = nn.MSELoss()
     dataset_torch = torch.tensor(dataset, dtype=torch.float32)
@@ -171,7 +155,6 @@ def autoencoder_embeddings(dataset):
 def load_graph(graph_file):
     with open(graph_file, "r") as f:
         edges = [tuple(line.strip().split()) for line in f]
-        print(edges)
     G = nx.DiGraph()
     G.add_edges_from(edges)
     mapping = {node: idx for idx, node in enumerate(G.nodes())}
@@ -183,9 +166,19 @@ def load_graph(graph_file):
     return data
 
 
+def load_graph_vis(graph_file):
+    with open(graph_file, "r") as f:
+        edges = [tuple(line.strip().split()) for line in f]
+    G = nx.DiGraph()
+    G.add_edges_from(edges)
+    mapping = {node: idx for idx, node in enumerate(G.nodes())}
+    G = nx.relabel_nodes(G, mapping)
+    return G
+
+
 # Function to train GCN model and generate embeddings
 def gcn_embeddings(data):
-    gcn_model = GCN(num_node_features=10, hidden_dim=16, num_classes=3)
+    gcn_model = GCN(num_node_features=10, hidden_dim=8, num_classes=10)
     optimizer = torch.optim.Adam(gcn_model.parameters(), lr=0.01)
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -204,7 +197,7 @@ def gcn_embeddings(data):
 
 # Function to train GraphSAGE model and generate embeddings
 def sage_embeddings(data):
-    sage_model = GraphSAGENet(in_channels=10, hidden_channels=16, out_channels=3)
+    sage_model = GraphSAGENet(in_channels=10, hidden_channels=16, out_channels=10)
     optimizer = torch.optim.Adam(sage_model.parameters(), lr=0.01)
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -221,40 +214,60 @@ def sage_embeddings(data):
         return sage_model.conv1(data.x, data.edge_index).mean(axis=0).numpy()
 
 
+def visualize_clusters(graph_clusters, graph_files, filename):
+    unique_clusters = np.unique(graph_clusters)
+    num_clusters = len(unique_clusters)
+
+    # Determine the number of graphs in the largest cluster to set the number of columns
+    max_graphs_in_cluster = max(np.bincount(graph_clusters))
+
+    fig, axes = plt.subplots(num_clusters, max_graphs_in_cluster, figsize=(max_graphs_in_cluster * 5, num_clusters * 5))
+
+    if num_clusters == 1:
+        axes = [axes]
+
+    colors = plt.get_cmap("tab10")
+
+    for i, cluster in enumerate(unique_clusters):
+        cluster_indices = np.where(graph_clusters == cluster)[0]
+        for j, idx in enumerate(cluster_indices):
+            G = load_graph_vis(graph_files[idx])
+            sorted_nodes = list(nx.topological_sort(G))
+            pos = nx.spiral_layout(G)  # use spring layout for better visualization
+            color_map = [colors(cluster)] * G.number_of_nodes()
+            if num_clusters == 1:
+                ax = axes[j]
+            else:
+                ax = axes[i, j]
+            nx.draw(G, pos, ax=ax, node_color=color_map, nodelist=sorted_nodes, node_size=50)
+            ax.set_title(f"Graph {idx} (Cluster {cluster})")
+
+    plt.tight_layout()
+    plt.savefig(filename)
+    plt.close()
+
+
 def main():
     logger.info("Loading datasets...")
     data_files = load_datasets("data/")
     datasets = [preprocess_dataset(file) for file in data_files]
 
-    logger.info("Standardizing dataset features...")
-    standardized_features = standardize_features(datasets)
-    logger.info("Standardizing dataset samples...")
-    standardized_samples = standardize_samples(datasets)
+    embedding_dim = 5  # Fixed embedding dimension
 
-    data_embeddings = []
+    data_embeddings_features = {method: [] for method in ['autoencoder']}
+    data_embeddings_samples = {method: [] for method in ['autoencoder']}
     dataset_names = [os.path.basename(file).replace(".csv", "") for file in data_files]
-    dataset_embedding_methods = [
-        # 'tsne',
-        #                            'umap',
-                                   # 'se',
-                                   # 'fa',
-                                   # 'kpca',
-                                   'autoencoder']
-    for method in dataset_embedding_methods:
-        logger.info(f"Generating embeddings using {method} method...")
-        for dataset in tqdm(standardized_features, desc=f"Feature standardization with {method}"):
-            if method == 'autoencoder':
-                embedding = autoencoder_embeddings(dataset)
-            else:
-                embedding = generate_embeddings(dataset, method)
-            data_embeddings.append((method, embedding))
 
-        for dataset in tqdm(standardized_samples, desc=f"Sample standardization with {method}"):
-            if method == 'autoencoder':
-                embedding = autoencoder_embeddings(dataset)
-            else:
-                embedding = generate_embeddings(dataset, method)
-            data_embeddings.append((method, embedding))
+    for method in ['autoencoder']:
+        logger.info(f"Generating embeddings using {method} method on datasets...")
+        for dataset in tqdm(datasets, desc=f"Generating embeddings with {method}"):
+            match method:
+                case 'autoencoder':
+                    embedding = autoencoder_embeddings(dataset, embedding_dim)
+                case _:
+                    embedding = generate_embeddings(dataset, method, embedding_dim)
+            data_embeddings_features[method].append(np.array(embedding))
+            data_embeddings_samples[method].append(np.array(embedding))
 
     logger.info("Loading graphs...")
     graph_files = load_graphs_from_txt("data/")
@@ -269,14 +282,35 @@ def main():
         "gcn": gcn_embeddings_list,
         "sage": sage_embeddings_list,
     }
+
+    for method in ['autoencoder']:
+        max_length_features = max(len(emb) for emb in data_embeddings_features[method])
+        data_embeddings_features[method] = pad_embeddings(data_embeddings_features[method], max_length_features)
+
+        max_length_samples = max(len(emb) for emb in data_embeddings_samples[method])
+        data_embeddings_samples[method] = pad_embeddings(data_embeddings_samples[method], max_length_samples)
+
     for graph_method, graph_embs in graph_embeddings_methods.items():
         logger.info(f"Clustering with {graph_method} embeddings...")
         graph_clusters = KMeans(n_clusters=3).fit_predict(graph_embs)
-        for dataset_method in dataset_embedding_methods:
-            dataset_embs = np.array([emb for method, emb in data_embeddings if method == dataset_method])
+
+        for dataset_method in ['autoencoder']:
+            logger.info(f"Clustering dataset embeddings using {dataset_method} method with feature standardization...")
+            dataset_embs = np.vstack(data_embeddings_features[dataset_method])
+            dataset_clusters = KMeans(n_clusters=3).fit_predict(dataset_embs)
+
+            score = adjusted_rand_score(graph_clusters, dataset_clusters)
+            logger.info(
+                f"ARI for {dataset_method} embeddings with {graph_method} graph clusters (features): {score:.4f}")
+
+            logger.info(f"Clustering dataset embeddings using {dataset_method} method with sample standardization...")
+            dataset_embs = np.vstack(data_embeddings_samples[dataset_method])
             dataset_clusters = KMeans(n_clusters=3).fit_predict(dataset_embs)
             score = adjusted_rand_score(graph_clusters, dataset_clusters)
-            logger.info(f"ARI for {dataset_method} embeddings with {graph_method} graph clusters: {score:.4f}")
+            logger.info(
+                f"ARI for {dataset_method} embeddings with {graph_method} graph clusters (samples): {score:.4f}")
+
+        visualize_clusters(graph_clusters, graph_files, f"{graph_method}_clusters.png")
 
 
 if __name__ == "__main__":

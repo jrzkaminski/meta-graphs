@@ -3,6 +3,9 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+from sklearn.metrics import adjusted_rand_score
+from sklearn.random_projection import GaussianRandomProjection
+from sklearn.preprocessing import OneHotEncoder
 import numpy as np
 
 
@@ -113,7 +116,7 @@ def read_graph_from_edgelist(file_path):
 # Function to count all motifs
 def count_all_motifs(graph):
     motifs = {
-        # 'edges': find_edges(graph),
+        'edges': find_edges(graph),
         'triangles': find_triangles(graph),
         'squares': find_squares(graph),
         'stars': find_stars(graph),
@@ -132,7 +135,7 @@ def count_all_motifs(graph):
     return motifs
 
 
-# Main function to process files in a directory and store results in a DataFrame
+# Main function to process graph files in a directory and store results in a DataFrame
 def process_graph_files(directory):
     data = []
     graphs = {}
@@ -153,12 +156,47 @@ def process_graph_files(directory):
     return df, graphs
 
 
-# Function to cluster datasets based on motif counts
-def cluster_datasets(df, n_clusters):
-    df_features = df.drop(columns=['file'])
-    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(df_features)
-    df['cluster'] = kmeans.labels_
-    return df, kmeans.labels_
+# Function to read CSV and generate JL embeddings
+def generate_jl_embeddings(directory):
+    data = []
+    max_length = 0
+    embeddings = {}
+    one_hot_encoder = OneHotEncoder()
+    for root, _, files in os.walk(directory):
+        for filename in files:
+            if filename.endswith(".csv"):
+                file_path = os.path.join(root, filename)
+                relative_path = os.path.relpath(file_path, directory)
+                df = pd.read_csv(file_path)
+
+                # One-hot encode categorical features
+                categorical_columns = df.select_dtypes(include=['object']).columns
+                if not categorical_columns.empty:
+                    one_hot_encoded = one_hot_encoder.fit_transform(df[categorical_columns]).toarray()
+                    df = df.drop(columns=categorical_columns)
+                    df = pd.concat([df, pd.DataFrame(one_hot_encoded)], axis=1)
+
+                embedding = df.values.flatten()
+                max_length = max(max_length, len(embedding))
+                embeddings[relative_path] = embedding
+
+    # Pad embeddings to the max length and apply JL projection
+    transformer = GaussianRandomProjection(n_components=1)
+    for key in embeddings:
+        embedding = embeddings[key]
+        padded_embedding = np.pad(embedding, (0, max_length - len(embedding)), 'constant')
+        embeddings[key] = transformer.fit_transform(padded_embedding.reshape(1, -1).astype(float)).flatten()
+        data.append(embeddings[key])
+
+    embeddings_df = pd.DataFrame(data)
+    print("Embeddings DataFrame head:\n", embeddings_df.head())  # Debug statement
+    return embeddings_df, embeddings
+
+
+# Function to cluster datasets based on embeddings
+def cluster_embeddings(df, n_clusters):
+    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(df)
+    return kmeans.labels_
 
 
 # Function to plot graphs in clusters and save the figure
@@ -190,11 +228,21 @@ if __name__ == "__main__":
     output_file = "clustered_graphs.png"  # Output file path
     n_clusters = 5  # Change this to the number of clusters you want
 
-    # Process files and count motifs
-    df, graphs = process_graph_files(directory)
+    # Process graph files and count motifs
+    df_graphs, graphs = process_graph_files(directory)
 
-    # Cluster datasets
-    df, labels = cluster_datasets(df, n_clusters)
+    # Generate JL embeddings for CSV datasets
+    df_embeddings, embeddings = generate_jl_embeddings(directory)
+
+    # Cluster graph motifs
+    df_graphs['cluster'] = cluster_embeddings(df_graphs.drop(columns=['file']), n_clusters)
+
+    # Cluster dataset embeddings
+    embedding_clusters = cluster_embeddings(df_embeddings, n_clusters)
+
+    # Compare clustering labels with ARI
+    ari_score = adjusted_rand_score(df_graphs['cluster'], embedding_clusters)
+    print(f"Adjusted Rand Index (ARI): {ari_score}")
 
     # Plot clustered graphs and save the figure
-    plot_clusters(df, graphs, n_clusters, output_file)
+    plot_clusters(df_graphs, graphs, n_clusters, output_file)

@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
-from sklearn.metrics import adjusted_rand_score
+from sklearn.metrics import adjusted_rand_score, adjusted_mutual_info_score, calinski_harabasz_score, completeness_score
 from sklearn.random_projection import GaussianRandomProjection
 from sklearn.preprocessing import OneHotEncoder
 import numpy as np
@@ -116,7 +116,7 @@ def read_graph_from_edgelist(file_path):
 # Function to count all motifs
 def count_all_motifs(graph):
     motifs = {
-        'edges': find_edges(graph),
+        # 'edges': find_edges(graph),
         'triangles': find_triangles(graph),
         'squares': find_squares(graph),
         'stars': find_stars(graph),
@@ -243,6 +243,10 @@ if __name__ == "__main__":
     # Compare clustering labels with ARI
     ari_score = adjusted_rand_score(df_graphs['cluster'], embedding_clusters)
     print(f"Adjusted Rand Index (ARI): {ari_score}")
+    adjusted_mutual_info_score = adjusted_mutual_info_score(df_graphs['cluster'], embedding_clusters)
+    print(f"Adjusted Mutual Information Score: {adjusted_mutual_info_score}")
+    completeness_score = completeness_score(df_graphs['cluster'], embedding_clusters)
+    print(f"Completeness Score: {completeness_score}")
 
     # Plot clustered graphs and save the figure
     plot_clusters(df_graphs, graphs, n_clusters, output_file)

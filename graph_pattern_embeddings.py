@@ -113,7 +113,6 @@ def read_graph_from_edgelist(file_path):
 # Function to count all motifs
 def count_all_motifs(graph):
     motifs = {
-        # 'edges': find_edges(graph),
         'triangles': find_triangles(graph),
         'squares': find_squares(graph),
         'stars': find_stars(graph),
@@ -195,6 +194,17 @@ if __name__ == "__main__":
 
     # Cluster datasets
     df, labels = cluster_datasets(df, n_clusters)
+
+    df_cl = df[['file', 'cluster']]
+
+    # remove filepaths from the file column
+    df_cl['file'] = df_cl['file'].apply(lambda x: x.split('/')[-1])
+
+    # remove txt extension from the file column
+    df_cl['file'] = df_cl['file'].apply(lambda x: x.split('.')[0])
+
+    # Save clustering results to CSV
+    df_cl.to_csv("clustering_results_graph_patterns.csv", index=False)
 
     # Plot clustered graphs and save the figure
     plot_clusters(df, graphs, n_clusters, output_file)

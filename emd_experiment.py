@@ -31,7 +31,8 @@ class DatasetProcessor:
             datasets.append(df.values)
         return datasets
 
-    def encode_categorical_features(self, df):
+    @staticmethod
+    def encode_categorical_features(df):
         categorical_columns = df.select_dtypes(include=['object', 'category']).columns
         if len(categorical_columns) > 0:
             encoder = OneHotEncoder(sparse_output=False, drop='first')
@@ -45,7 +46,8 @@ class DatasetProcessor:
         reduced_datasets = [pca.fit_transform(dataset) for dataset in self.datasets]
         return reduced_datasets
 
-    def compute_emd(self, data1, data2):
+    @staticmethod
+    def compute_emd(data1, data2):
         cost_matrix = cdist(data1, data2, metric='euclidean')
         n, n1 = data1.shape[0], data2.shape[0]
         weights1 = np.ones(n) / n
@@ -63,6 +65,7 @@ class DatasetProcessor:
                 emd_matrix[j, i] = emd_value  # EMD is symmetric
         return emd_matrix
 
+
 def main():
     folder_path = 'data/'
     target_dim = 3  # Desired dimensionality for PCA
@@ -70,6 +73,7 @@ def main():
     emd_matrix = processor.calculate_emd_matrix()
     print("EMD Matrix:")
     print(emd_matrix)
+
 
 if __name__ == "__main__":
     main()

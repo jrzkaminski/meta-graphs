@@ -9,6 +9,7 @@ from sklearn.preprocessing import OneHotEncoder
 from scipy.spatial.distance import cdist
 import ot
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 class DatasetProcessor:
     def __init__(self, folder_path, target_dim, exclude_files=None):
@@ -62,7 +63,7 @@ class DatasetProcessor:
     def calculate_emd_matrix(self):
         num_datasets = len(self.reduced_datasets)
         emd_matrix = np.zeros((num_datasets, num_datasets))
-        for i in range(num_datasets):
+        for i in tqdm(range(num_datasets), "Computing EMD Matrix"):
             for j in range(i, num_datasets):
                 emd_value = self.compute_emd(self.reduced_datasets[i], self.reduced_datasets[j])
                 emd_matrix[i, j] = emd_value
@@ -97,10 +98,9 @@ def plot_heatmap_and_cluster(emd_df, n_clusters=5, save_html=True):
     plt.show()
 
 def main():
-    folder_path = 'data/'
-    target_dim = 3  # Desired dimensionality for PCA
-    exclude_files = ['mehra-complete.csv']  # Files to exclude
-    processor = DatasetProcessor(folder_path, target_dim, exclude_files)
+    folder_path = 'data/synthetic_data_small'
+    target_dim = 10  # Desired dimensionality for PCA
+    processor = DatasetProcessor(folder_path, target_dim)
     emd_matrix = processor.calculate_emd_matrix()
 
     # Convert to DataFrame and save

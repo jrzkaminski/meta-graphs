@@ -39,7 +39,12 @@ if __name__ == "__main__":
     for metric, value in metrics.items():
         print(f"{metric}: {value}")
 
-
+# real
 # Adjusted Rand Index: -0.007281869238656888
 # Normalized Mutual Information: 0.1110798030808294
 # Fowlkes-Mallows Index: 0.4610569539421821
+
+# Synthetic
+# Adjusted Rand Index: 0.02166603526498552
+# Normalized Mutual Information: 0.11051451764115085
+# Fowlkes-Mallows Index: 0.5086816433388088

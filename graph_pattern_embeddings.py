@@ -185,7 +185,7 @@ def plot_clusters(df, graphs, n_clusters, output_file):
 
 # Example usage
 if __name__ == "__main__":
-    directory = "data/"
+    directory = "data/synthetic_data_small"
     output_file = "clustered_graphs.png"  # Output file path
     n_clusters = 5  # Change this to the number of clusters you want
 

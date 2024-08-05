@@ -1,7 +1,0 @@
-feature_0 feature_5
-feature_0 feature_8
-feature_1 feature_13
-feature_2 feature_12
-feature_5 feature_11
-feature_6 feature_13
-feature_8 feature_14

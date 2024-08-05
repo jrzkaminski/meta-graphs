@@ -1,0 +1,8 @@
+feature_0 feature_12
+feature_0 feature_15
+feature_2 feature_13
+feature_4 feature_8
+feature_5 feature_19
+feature_6 feature_18
+feature_8 feature_17
+feature_11 feature_15

@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 import numpy as np
+from scipy.cluster.hierarchy import linkage, fcluster
 
 
 def find_edges(graph):
@@ -123,11 +124,12 @@ def count_all_motifs(graph):
         'houses': find_house(graph),
         'tents': find_tent(graph)
     }
-    total_motifs = sum(motifs.values())
-    if total_motifs == 0:
-        total_motifs = 1  # To avoid division by zero
+
+    max_motif_count = max(motifs.values())
+    if max_motif_count == 0:
+        max_motif_count = 1  # To avoid division by zero
     for key in motifs:
-        motifs[key] = motifs[key] / total_motifs
+        motifs[key] = motifs[key] / max_motif_count
     return motifs
 
 
@@ -153,11 +155,25 @@ def process_graph_files(directory):
 
 
 # Function to cluster datasets based on motif counts
+# def cluster_datasets(df, n_clusters):
+#     df_features = df.drop(columns=['file'])
+#     kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(df_features)
+#     df['cluster'] = kmeans.labels_
+#     return df, kmeans.labels_
+
 def cluster_datasets(df, n_clusters):
     df_features = df.drop(columns=['file'])
-    kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(df_features)
-    df['cluster'] = kmeans.labels_
-    return df, kmeans.labels_
+
+    # Perform hierarchical clustering
+    linkage_matrix = linkage(df_features, method='ward')
+
+    # Assign clusters
+    cluster_labels = fcluster(linkage_matrix, n_clusters, criterion='maxclust')
+
+    # Add the cluster labels to the DataFrame
+    df['cluster'] = cluster_labels
+
+    return df, cluster_labels
 
 
 # Function to plot graphs in clusters and save the figure
@@ -185,8 +201,8 @@ def plot_clusters(df, graphs, n_clusters, output_file):
 
 # Example usage
 if __name__ == "__main__":
-    directory = "data/synthetic_data_small"
-    output_file = "clustered_graphs.png"  # Output file path
+    directory = "data/synthetic_data_small_linear"
+    output_file = "clustered_graphs_linear.png"  # Output file path
     n_clusters = 5  # Change this to the number of clusters you want
 
     # Process files and count motifs
@@ -204,7 +220,7 @@ if __name__ == "__main__":
     df_cl['file'] = df_cl['file'].apply(lambda x: x.split('.')[0])
 
     # Save clustering results to CSV
-    df_cl.to_csv("clustering_results_graph_patterns.csv", index=False)
+    df_cl.to_csv("clustering_results_graph_patterns_linear.csv", index=False)
 
     # Plot clustered graphs and save the figure
     plot_clusters(df, graphs, n_clusters, output_file)

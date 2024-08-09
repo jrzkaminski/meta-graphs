@@ -10,6 +10,7 @@ from scipy.spatial.distance import cdist
 import ot
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from sklearn.neighbors import KernelDensity
 
 class DatasetProcessor:
     def __init__(self, folder_path, target_dim, exclude_files=None):
@@ -52,11 +53,19 @@ class DatasetProcessor:
         reduced_datasets = [pca.fit_transform(dataset) for dataset in self.datasets]
         return reduced_datasets
 
+    @staticmethod
+    def compute_weights_with_kde(data):
+        kde = KernelDensity(kernel='gaussian', bandwidth=1.0).fit(data)
+        log_density = kde.score_samples(data)
+        weights = np.exp(log_density)  # Convert log density to actual density
+        weights /= weights.sum()  # Normalize weights
+        return weights
+
     def compute_emd(self, data1, data2):
-        cost_matrix = cdist(data1, data2, metric='euclidean')
-        n, n1 = data1.shape[0], data2.shape[0]
-        weights1 = np.ones(n) / n
-        weights2 = np.ones(n1) / n1
+        cost_matrix = ot.dist(data1, data2, metric='euclidean')
+        # n, n1 = data1.shape[0], data2.shape[0]
+        weights1 = self.compute_weights_with_kde(data1)
+        weights2 = self.compute_weights_with_kde(data2)
         emd_value = ot.emd2(weights1, weights2, cost_matrix)
         return emd_value
 
@@ -97,21 +106,30 @@ def plot_heatmap_and_cluster(emd_df, n_clusters=5, save_html=True):
     plt.ylabel('Distance')
     plt.show()
 
+
 def main():
-    folder_path = 'data/synthetic_data_small'
+    folder_path = 'data/synthetic_data_small_linear'
     target_dim = 10  # Desired dimensionality for PCA
     processor = DatasetProcessor(folder_path, target_dim)
     emd_matrix = processor.calculate_emd_matrix()
 
-    # Convert to DataFrame and save
+    # Convert to DataFrame
     dataset_names = [os.path.basename(file).replace('.csv', '') for file in processor.dataset_files]
     emd_df = pd.DataFrame(emd_matrix, index=dataset_names, columns=dataset_names)
-    emd_df.to_csv('emd_matrix.csv')
+
+    # Apply logarithm (natural log)
+    emd_df = np.log1p(emd_df)  # log1p is used to handle zero values safely
+
+    # Normalize the DataFrame
+    emd_df = (emd_df - emd_df.min().min()) / (emd_df.max().max() - emd_df.min().min())
+
+    # Save the normalized DataFrame
+    emd_df.to_csv('emd_matrix_linear_normalized.csv')
 
     # Plot heatmap and perform clustering
     plot_heatmap_and_cluster(emd_df)
 
-    print("EMD Matrix DataFrame:")
+    print("Normalized EMD Matrix DataFrame:")
     print(emd_df)
 
 if __name__ == "__main__":

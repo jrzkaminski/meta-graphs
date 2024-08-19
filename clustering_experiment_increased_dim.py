@@ -181,7 +181,7 @@ def plot_clusters(df, graphs, n_clusters, output_file):
 # Example usage
 if __name__ == "__main__":
     directory = "data/"
-    output_file = "clustered_graphs.png"  # Output file path
+    output_file = "result_plots/clustered_graphs.png"  # Output file path
     n_clusters = 5  # Change this to the number of clusters you want
 
     # Process files and count motifs

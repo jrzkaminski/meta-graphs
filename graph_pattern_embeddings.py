@@ -202,7 +202,7 @@ def plot_clusters(df, graphs, n_clusters, output_file):
 # Example usage
 if __name__ == "__main__":
     directory = "data/synthetic_data_small_linear"
-    output_file = "clustered_graphs_linear.png"  # Output file path
+    output_file = "result_plots/clustered_graphs_linear.png"  # Output file path
     n_clusters = 5  # Change this to the number of clusters you want
 
     # Process files and count motifs

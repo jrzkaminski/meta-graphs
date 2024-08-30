@@ -69,3 +69,9 @@ if __name__ == "__main__":
 # Adjusted Rand Index: 0.04646701692166725
 # Normalized Mutual Information: 0.10378519064665899
 # Fowlkes-Mallows Index: 0.3551501381607059
+
+# linear, no noise, normalized, covariance distance frobenius
+# Clustering Comparison Metrics:
+# Adjusted Rand Index: 0.00904573773667353
+# Normalized Mutual Information: 0.06402834113755773
+# Fowlkes-Mallows Index: 0.45049242936538264
